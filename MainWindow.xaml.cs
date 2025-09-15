@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using Microsoft.Win32;
@@ -14,7 +13,7 @@ using DocDocument = Spire.Doc.Document;
 using PdfFileFormat = Spire.Pdf.FileFormat;
 using DocFileFormat = Spire.Doc.FileFormat;
 
-// ImportFormatMode lives under Spire.Doc.Documents
+// Bring in Section, Paragraph, etc.
 using Spire.Doc.Documents;
 
 namespace WpfChunkPdfToDocx
@@ -48,7 +47,6 @@ namespace WpfChunkPdfToDocx
                     Path.GetDirectoryName(inputPdfPath)!,
                     Path.GetFileNameWithoutExtension(inputPdfPath) + "_converted.docx");
 
-                // Run conversion on background thread
                 await Task.Run(() => ConvertPdfToDocxInChunks(inputPdfPath, outputDocxPath, 10));
 
                 TxtStatus.Text = $"Status: done → {outputDocxPath}";
@@ -74,7 +72,6 @@ namespace WpfChunkPdfToDocx
         /// </summary>
         private void ConvertPdfToDocxInChunks(string pdfPath, string finalDocxPath, int chunkSize)
         {
-            // Ensure temp work folder
             string workDir = Path.Combine(Path.GetTempPath(), "PdfToDocxChunks_" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(workDir);
 
@@ -102,14 +99,13 @@ namespace WpfChunkPdfToDocx
                         string chunkPdfPath = Path.Combine(workDir, $"chunk_{chunkIndex + 1}.pdf");
                         string chunkDocxPath = Path.Combine(workDir, $"chunk_{chunkIndex + 1}.docx");
 
-                        // Build a temporary PDF that only contains [startPage, endPageExclusive)
                         BuildChunkPdf(pdfPath, chunkPdfPath, startPage, endPageExclusive);
 
-                        // Convert this chunk PDF → DOCX (Spire.PDF can save to DOCX directly)
                         using (var chunkDoc = new PdfDocument())
                         {
                             chunkDoc.LoadFromFile(chunkPdfPath);
-                            chunkDoc.SaveToFile(chunkDocxPath, PdfFileFormat.DOCX); // alias avoids clash
+                            // Use Spire.PDF's FileFormat enum
+                            chunkDoc.SaveToFile(chunkDocxPath, PdfFileFormat.DOCX);
                         }
 
                         tempDocxParts.Add(chunkDocxPath);
@@ -125,7 +121,6 @@ namespace WpfChunkPdfToDocx
                     }
                 }
 
-                // Merge all chunk DOCX into one final DOCX
                 MergeDocxFiles(tempDocxParts, finalDocxPath);
 
                 DispatcherInvoke(() =>
@@ -137,66 +132,55 @@ namespace WpfChunkPdfToDocx
             }
             finally
             {
-                // Cleanup temporary folder
                 try { Directory.Delete(workDir, true); } catch { /* ignore */ }
             }
         }
 
         /// <summary>
         /// Creates a temporary PDF containing only pages [start, endExclusive).
-        /// Strategy: reload original PDF, remove pages outside range.
         /// </summary>
         private static void BuildChunkPdf(string sourcePdfPath, string outPdfPath, int start, int endExclusive)
         {
             using var doc = new PdfDocument();
             doc.LoadFromFile(sourcePdfPath);
 
-            // Remove pages we do NOT need (iterate from end for safety)
             for (int i = doc.Pages.Count - 1; i >= 0; i--)
-            {
-                if (i < start || i >= endExclusive)
-                {
-                    doc.Pages.RemoveAt(i);
-                }
-            }
+                if (i < start || i >= endExclusive) doc.Pages.RemoveAt(i);
 
-            doc.SaveToFile(outPdfPath); // keep as PDF for the intermediary
+            doc.SaveToFile(outPdfPath); // intermediary stays PDF
         }
 
         /// <summary>
-        /// Merges DOCX files back-to-back using Spire.Doc.
+        /// Merge DOCX files using section-by-section copy (compatible with Spire.Office 10.8.0).
         /// </summary>
         private static void MergeDocxFiles(List<string> docxPaths, string outputDocxPath)
         {
             if (docxPaths == null || docxPaths.Count == 0)
                 throw new InvalidOperationException("No DOCX parts to merge.");
 
-            DocDocument? merged = null;
+            var merged = new DocDocument();
+            merged.LoadFromFile(docxPaths[0]);
 
-            foreach (var path in docxPaths)
+            for (int i = 1; i < docxPaths.Count; i++)
             {
                 var part = new DocDocument();
-                part.LoadFromFile(path);
+                part.LoadFromFile(docxPaths[i]);
 
-                if (merged == null)
+                foreach (Section sec in part.Sections)
                 {
-                    merged = part; // take ownership of first
+                    // Clone() returns a DocumentObject; cast back to Section
+                    Section cloned = (Section)sec.Clone();
+                    merged.Sections.Add(cloned);
                 }
-                else
-                {
-                    merged.AppendDocument(part, ImportFormatMode.KeepSourceFormatting);
-                    part.Close();
-                }
+
+                part.Close();
             }
 
-            merged!.SaveToFile(outputDocxPath, DocFileFormat.Docx);
+            merged.SaveToFile(outputDocxPath, DocFileFormat.Docx);
             merged.Close();
         }
 
-        private void DispatcherInvoke(Action action)
-        {
-            Dispatcher.Invoke(action);
-        }
+        private void DispatcherInvoke(Action action) => Dispatcher.Invoke(action);
 
         private void Log(string message)
         {

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net6.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Spire.PDF (PDF -> DOCX) -->
+    <PackageReference Include="Spire.PDF" Version="10.9.3" />
+    <!-- Spire.Doc (merge DOCX parts) -->
+    <PackageReference Include="Spire.Doc" Version="12.8.0" />
+  </ItemGroup>
+
+</Project>

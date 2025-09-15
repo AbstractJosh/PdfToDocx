@@ -3,20 +3,19 @@ private static void MergeDocxFiles(List<string> docxPaths, string outputDocxPath
     if (docxPaths == null || docxPaths.Count == 0)
         throw new InvalidOperationException("No DOCX parts to merge.");
 
-    // Load first as the base
+    // Load first DOCX as base
     var merged = new DocDocument();
     merged.LoadFromFile(docxPaths[0]);
 
-    // Append each subsequent DOCX manually
     for (int i = 1; i < docxPaths.Count; i++)
     {
         var part = new DocDocument();
         part.LoadFromFile(docxPaths[i]);
 
-        foreach (Section sec in part.Sections)
+        // Append all child objects (paragraphs, tables, etc.)
+        foreach (var obj in part.Sections[0].Body.ChildObjects)
         {
-            // Clone each section and add to merged doc
-            merged.Sections.Add(sec.Clone());
+            merged.Sections[0].Body.ChildObjects.Add(obj.Clone());
         }
 
         part.Close();

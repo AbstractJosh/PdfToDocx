@@ -1,0 +1,41 @@
+<Window x:Class="WpfChunkPdfToDocx.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="PDF to DOCX (10-page chunks)" Height="220" Width="520">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="10"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Button x:Name="BtnSelect"
+                Content="Select PDF and Convert"
+                Padding="10,6"
+                Width="220"
+                Click="BtnSelect_Click"/>
+
+        <TextBlock Grid.Row="2"
+                   x:Name="TxtStatus"
+                   Text="Status: idle"
+                   Margin="0,4,0,0"/>
+
+        <ProgressBar Grid.Row="4"
+                     x:Name="Progress"
+                     Height="22"
+                     Minimum="0"
+                     Maximum="100"
+                     Value="0"/>
+
+        <TextBox Grid.Row="5"
+                 x:Name="TxtLog"
+                 Margin="0,10,0,0"
+                 VerticalScrollBarVisibility="Auto"
+                 TextWrapping="Wrap"
+                 AcceptsReturn="True"
+                 IsReadOnly="True"/>
+    </Grid>
+</Window>

@@ -1,13 +1,21 @@
-using Microsoft.Win32;
-using Spire.Doc;
-using Spire.Doc.Documents;
-using Spire.Pdf;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using Microsoft.Win32;
+
+// --- Spire aliases to avoid type/enum collisions ---
+using PdfDocument = Spire.Pdf.PdfDocument;
+using DocDocument = Spire.Doc.Document;
+
+// Both libraries define FileFormat; alias them:
+using PdfFileFormat = Spire.Pdf.FileFormat;
+using DocFileFormat = Spire.Doc.FileFormat;
+
+// ImportFormatMode lives under Spire.Doc.Documents
+using Spire.Doc.Documents;
 
 namespace WpfChunkPdfToDocx
 {
@@ -40,6 +48,7 @@ namespace WpfChunkPdfToDocx
                     Path.GetDirectoryName(inputPdfPath)!,
                     Path.GetFileNameWithoutExtension(inputPdfPath) + "_converted.docx");
 
+                // Run conversion on background thread
                 await Task.Run(() => ConvertPdfToDocxInChunks(inputPdfPath, outputDocxPath, 10));
 
                 TxtStatus.Text = $"Status: done → {outputDocxPath}";
@@ -96,12 +105,11 @@ namespace WpfChunkPdfToDocx
                         // Build a temporary PDF that only contains [startPage, endPageExclusive)
                         BuildChunkPdf(pdfPath, chunkPdfPath, startPage, endPageExclusive);
 
-                        // Convert this chunk PDF → DOCX
+                        // Convert this chunk PDF → DOCX (Spire.PDF can save to DOCX directly)
                         using (var chunkDoc = new PdfDocument())
                         {
                             chunkDoc.LoadFromFile(chunkPdfPath);
-                            // Spire.PDF can directly save as DOCX
-                            chunkDoc.SaveToFile(chunkDocxPath, FileFormat.DOCX);
+                            chunkDoc.SaveToFile(chunkDocxPath, PdfFileFormat.DOCX); // alias avoids clash
                         }
 
                         tempDocxParts.Add(chunkDocxPath);
@@ -129,7 +137,7 @@ namespace WpfChunkPdfToDocx
             }
             finally
             {
-                // Cleanup temp PDFs (keep temp docx only if you want)
+                // Cleanup temporary folder
                 try { Directory.Delete(workDir, true); } catch { /* ignore */ }
             }
         }
@@ -143,7 +151,7 @@ namespace WpfChunkPdfToDocx
             using var doc = new PdfDocument();
             doc.LoadFromFile(sourcePdfPath);
 
-            // Remove pages we do NOT need (from the end down to start for index safety)
+            // Remove pages we do NOT need (iterate from end for safety)
             for (int i = doc.Pages.Count - 1; i >= 0; i--)
             {
                 if (i < start || i >= endExclusive)
@@ -152,7 +160,7 @@ namespace WpfChunkPdfToDocx
                 }
             }
 
-            doc.SaveToFile(outPdfPath);
+            doc.SaveToFile(outPdfPath); // keep as PDF for the intermediary
         }
 
         /// <summary>
@@ -163,11 +171,11 @@ namespace WpfChunkPdfToDocx
             if (docxPaths == null || docxPaths.Count == 0)
                 throw new InvalidOperationException("No DOCX parts to merge.");
 
-            Document? merged = null;
+            DocDocument? merged = null;
 
             foreach (var path in docxPaths)
             {
-                var part = new Document();
+                var part = new DocDocument();
                 part.LoadFromFile(path);
 
                 if (merged == null)
@@ -181,7 +189,7 @@ namespace WpfChunkPdfToDocx
                 }
             }
 
-            merged!.SaveToFile(outputDocxPath, FileFormat.Docx);
+            merged!.SaveToFile(outputDocxPath, DocFileFormat.Docx);
             merged.Close();
         }
 
